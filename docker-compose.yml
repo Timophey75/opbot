@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  webapp:
+    build: .
+    ports:
+      - "5000:5000"
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ADMIN_CODE=${ADMIN_CODE}
+      - WEB_APP_URL=http://localhost:5000
+    volumes:
+      - ./schedule.db:/app/schedule.db
+    restart: unless-stopped
+
+  bot:
+    build: .
+    command: python bot.py
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - ADMIN_CODE=${ADMIN_CODE}
+      - WEB_APP_URL=http://webapp:5000
+    volumes:
+      - ./schedule.db:/app/schedule.db
+    depends_on:
+      - webapp
+    restart: unless-stopped
