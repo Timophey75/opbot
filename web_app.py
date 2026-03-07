@@ -72,6 +72,36 @@ def login():
     if not code or not user_id:
         return jsonify({'success': False, 'error': 'Missing credentials'}), 400
     
+    # Сначала проверяем, совпадает ли код с ADMIN_CODE
+    if code == ADMIN_CODE:
+        # Ищем админа в базе или создаем его
+        admin = db.get_user_by_code(code)
+        if not admin:
+            # Создаем администратора если его нет
+            admin_id = db.create_user(
+                user_id=user_id,
+                name="Администратор",
+                surname="Системы",
+                code=code,
+                is_admin=1
+            )
+            admin = db.get_user_by_id(admin_id)
+        
+        sessions[user_id] = {
+            'id': admin['id'],
+            'name': admin['name'],
+            'surname': admin['surname'],
+            'code': admin['code'],
+            'color_emoji': admin['color_emoji'],
+            'is_admin': admin['is_admin'],
+            'user_id': admin['user_id']
+        }
+        
+        return jsonify({
+            'success': True,
+            'user': sessions[user_id]
+        }), 200
+    
     # Поиск пользователя по коду
     user = db.get_user_by_code(code)
     
