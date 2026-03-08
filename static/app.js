@@ -346,18 +346,22 @@ class ScheduleApp {
             const content = document.getElementById('remindersContent');
             let html = '';
 
-            // Только утро и вечер накануне
+            // Типы напоминаний (добавлен день до без времени)
             const reminderTypes = [
+                { id: 'day_before', label: '📅 Напомнить за сутки', timeField: null, defaultTime: null },
                 { id: 'morning', label: '🌅 Напомнить утром', timeField: 'time_morning', defaultTime: '10:00' },
                 { id: 'evening_before', label: '🌆 Напомнить вечером накануне', timeField: 'time_evening', defaultTime: '19:00' }
             ];
 
             reminderTypes.forEach(type => {
-                const reminder = data.reminders.find(r => r.type === type.id) || {
-                    type: type.id,
-                    [type.timeField]: type.defaultTime,
-                    enabled: 1
-                };
+                // создаём объект напоминания, не добавляя поля времени если его нет
+                let reminder = data.reminders.find(r => r.type === type.id);
+                if (!reminder) {
+                    reminder = { type: type.id, enabled: 1 };
+                    if (type.timeField) {
+                        reminder[type.timeField] = type.defaultTime;
+                    }
+                }
 
                 html += `<div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 15px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
@@ -369,11 +373,12 @@ class ScheduleApp {
                         </label>
                     </div>
                     
-                    <div class="input-group">
+                    ${type.timeField ?
+                    `<div class="input-group">
                         <label style="font-size: 12px;">Время:</label>
                         <input type="time" id="time_${type.timeField}_${type.id}" value="${reminder[type.timeField] || type.defaultTime}"
                                onchange="app.updateReminderTime('${type.id}', '${type.timeField}', this.value)">
-                    </div>
+                    </div>` : ''}
                 </div>`;
             });
 
@@ -437,19 +442,35 @@ class ScheduleApp {
             let html = '';
 
             data.operators.forEach(op => {
-                html += `<div class="operator-item">
-                    <div class="operator-info">
-                        <span class="operator-color">${op.color_emoji}</span>
-                        <div>
-                            <div class="operator-name">${op.name} ${op.surname}</div>
-                            <div class="operator-code">Код: ${op.code}</div>
+                // отметим администратора и запретим редактировать/удалять
+                if (op.is_admin) {
+                    html += `<div class="operator-item" style="background: #fff3cd;">
+                        <div class="operator-info">
+                            <span class="operator-color">${op.color_emoji}</span>
+                            <div>
+                                <div class="operator-name">${op.name} ${op.surname} <strong>(Админ)</strong></div>
+                                <div class="operator-code">Код: ${op.code}</div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="operator-actions">
-                        <button class="icon-btn" onclick="app.editOperatorModal(${op.id}, '${op.name}', '${op.surname}')">✏️</button>
-                        <button class="icon-btn" onclick="app.deleteOperator(${op.id})">🗑️</button>
-                    </div>
-                </div>`;
+                        <div class="operator-actions">
+                            <span style="color:#999; font-size:14px;">—</span>
+                        </div>
+                    </div>`;
+                } else {
+                    html += `<div class="operator-item">
+                        <div class="operator-info">
+                            <span class="operator-color">${op.color_emoji}</span>
+                            <div>
+                                <div class="operator-name">${op.name} ${op.surname}</div>
+                                <div class="operator-code">Код: ${op.code}</div>
+                            </div>
+                        </div>
+                        <div class="operator-actions">
+                            <button class="icon-btn" onclick="app.editOperatorModal(${op.id}, '${op.name}', '${op.surname}')">✏️</button>
+                            <button class="icon-btn" onclick="app.deleteOperator(${op.id})">🗑️</button>
+                        </div>
+                    </div>`;
+                }
             });
 
             list.innerHTML = html || '<div style="text-align: center; color: #999; padding: 20px;">Нет операторов</div>';
@@ -475,14 +496,10 @@ class ScheduleApp {
 
         html += `<div class="input-group">
             <label>Время события:</label>
-            <div style="display: flex; gap: 10px; margin-bottom: 15px;">
-                <label style="flex: 1; display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="radio" name="timeType" value="default" checked onchange="app.toggleTimeInput('default')">
-                    <span>Стандартное время</span>
-                </label>
-                <label style="flex: 1; display: flex; align-items: center; gap: 8px; cursor: pointer;">
-                    <input type="radio" name="timeType" value="custom" onchange="app.toggleTimeInput('custom')">
-                    <span>Своё время</span>
+            <div style="margin-bottom: 15px;">
+                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                    <input type="checkbox" id="useCustomTime" onchange="app.toggleTimeInput(this.checked)">
+                    <span>Указать своё время</span>
                 </label>
             </div>
             <input type="time" id="customTime" style="display: none;" value="${period === 'morning' ? '10:00' : '19:00'}">
@@ -501,17 +518,20 @@ class ScheduleApp {
         this.openModal(html);
     }
 
-    toggleTimeInput(type) {
+    toggleTimeInput(typeOrChecked) {
         const customInput = document.getElementById('customTime');
-        customInput.style.display = type === 'custom' ? 'block' : 'none';
+        if (typeof typeOrChecked === 'boolean') {
+            customInput.style.display = typeOrChecked ? 'block' : 'none';
+        } else {
+            customInput.style.display = typeOrChecked === 'custom' ? 'block' : 'none';
+        }
     }
 
     async createEvent(period) {
         const title = document.getElementById('eventTitle').value;
-        const timeType = document.querySelector('input[name="timeType"]:checked').value;
         let time = period === 'morning' ? '10:00' : '19:00';
-
-        if (timeType === 'custom') {
+        const useCustom = document.getElementById('useCustomTime')?.checked;
+        if (useCustom) {
             time = document.getElementById('customTime').value;
         }
 

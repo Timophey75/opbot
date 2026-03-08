@@ -227,6 +227,8 @@
             padding: 4px;
             position: relative;
             background: white;
+            overflow: hidden;
+            min-width: 0;
         }
 
         .day-cell:hover {
@@ -252,9 +254,17 @@
 
         .operators-icons {
             display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
             gap: 2px;
             margin-top: 2px;
             font-size: 12px;
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        .day-cell {
+            min-width: 0;
         }
 
         /* День детально */
