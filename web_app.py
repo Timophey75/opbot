@@ -427,25 +427,6 @@ def create_operator():
         }
     }), 201
 
-@app.route('/api/operators/<int:operator_id>/update', methods=['PUT'])
-def update_operator(operator_id):
-    """Обновляет данные оператора"""
-    data = request.json
-    user_id = data.get('user_id')
-    
-    if user_id not in sessions or not sessions[user_id].get('is_admin'):
-        return jsonify({'success': False, 'error': 'No permission'}), 403
-    
-    name = data.get('name')
-    surname = data.get('surname')
-    
-    if not name or not surname:
-        return jsonify({'success': False, 'error': 'Name and surname required'}), 400
-    
-    db.update_user(operator_id, name, surname)
-    
-    return jsonify({'success': True}), 200
-
 @app.route('/api/operators/<int:operator_id>/delete', methods=['DELETE'])
 def delete_operator(operator_id):
     """Удаляет оператора"""
