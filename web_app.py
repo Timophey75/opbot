@@ -149,23 +149,14 @@ def get_calendar():
                 events = db.get_events_by_date(date_str)
                 operators = []
                 
-                # Утро
-                morning_events = [e for e in events if e['period'] == 'morning']
-                if morning_events:
-                    operator = None
-                    if morning_events[0]['operator_id']:
-                        op_user = db.get_user_by_id(morning_events[0]['operator_id'])
+                # Собираем все уникальные эмодзи операторов со всех событий на день
+                operator_ids_seen = set()
+                for event in events:
+                    if event['operator_id'] and event['operator_id'] not in operator_ids_seen:
+                        op_user = db.get_user_by_id(event['operator_id'])
                         if op_user:
                             operators.append(op_user['color_emoji'])
-                
-                # Вечер
-                evening_events = [e for e in events if e['period'] == 'evening']
-                if evening_events:
-                    operator = None
-                    if evening_events[0]['operator_id']:
-                        op_user = db.get_user_by_id(evening_events[0]['operator_id'])
-                        if op_user:
-                            operators.append(op_user['color_emoji'])
+                            operator_ids_seen.add(event['operator_id'])
                 
                 week_data.append({
                     'day': day,
@@ -345,25 +336,65 @@ def refuse_shift(event_id):
 
 @app.route('/api/operators/list', methods=['GET'])
 def get_operators():
-    """Получает список всех операторов (только администратор)"""
+    """Получает список всех операторов (только администратор).
+    В список также добавляется сам администратор, чтобы он мог
+    назначать себя на смену. Поле is_admin указывает, что это админ.
+    """
     user_id = request.args.get('user_id')
     
     if user_id not in sessions or not sessions[user_id].get('is_admin'):
         return jsonify({'error': 'No permission'}), 403
     
     operators = db.get_all_operators()
+    admin = sessions[user_id]
     
     operators_data = []
+    # вставляем администратора первым
+    operators_data.append({
+        'id': admin['id'],
+        'name': admin['name'],
+        'surname': admin['surname'],
+        'code': admin.get('code', ''),
+        'color_emoji': admin['color_emoji'],
+        'is_admin': 1
+    })
+    
     for op in operators:
         operators_data.append({
             'id': op['id'],
             'name': op['name'],
             'surname': op['surname'],
             'code': op['code'],
-            'color_emoji': op['color_emoji']
+            'color_emoji': op['color_emoji'],
+            'is_admin': 0
         })
     
     return jsonify({'operators': operators_data}), 200
+
+@app.route('/api/operators/<int:operator_id>/update', methods=['PUT'])
+def update_operator(operator_id):
+    """Обновляет имя и фамилию оператора (админ может редактировать и себя)"""
+    data = request.json
+    user_id = data.get('user_id')
+    
+    if user_id not in sessions or not sessions[user_id].get('is_admin'):
+        return jsonify({'success': False, 'error': 'Not authenticated'}), 403
+    
+    name = data.get('name', '')
+    surname = data.get('surname', '')
+    
+    if not name or not surname:
+        return jsonify({'success': False, 'error': 'Name and surname required'}), 400
+    
+    # Обновляем оператора
+    db.update_user(operator_id, name, surname)
+    
+    # Если админ редактирует себя, обновляем сессию
+    if operator_id == sessions[user_id]['id']:
+        sessions[user_id]['name'] = name
+        sessions[user_id]['surname'] = surname
+    
+    return jsonify({'success': True}), 200
 
 @app.route('/api/operators/create', methods=['POST'])
 def create_operator():

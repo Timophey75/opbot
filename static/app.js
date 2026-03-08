@@ -442,8 +442,8 @@ class ScheduleApp {
             let html = '';
 
             data.operators.forEach(op => {
-                // отметим администратора и запретим редактировать/удалять
                 if (op.is_admin) {
+                    // Админ тоже может редактировать себя (но не удаляться)
                     html += `<div class="operator-item" style="background: #fff3cd;">
                         <div class="operator-info">
                             <span class="operator-color">${op.color_emoji}</span>
@@ -453,6 +453,7 @@ class ScheduleApp {
                             </div>
                         </div>
                         <div class="operator-actions">
+                            <button class="icon-btn" onclick="app.editOperatorModal(${op.id}, '${op.name}', '${op.surname}')">✏️</button>
                             <span style="color:#999; font-size:14px;">—</span>
                         </div>
                     </div>`;
