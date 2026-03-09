@@ -166,7 +166,7 @@ mv ngrok /data/data/com.termux/files/usr/bin/
 screen -dmS web python web_app.py
 
 # Запустите туннель (бесплатный, временный URL ~8 часов)
-screen -dmS tunnel ngrok http 5000
+screen -dmS tunnel ngrok http 5000 --region eu  # Для РФ используйте EU регион
 
 # Получите URL
 screen -r tunnel
@@ -188,6 +188,24 @@ npm install -g localtunnel
 lt --port 5000
 # Получите URL вроде https://xxxxx.loca.lt
 ```
+
+### Дополнительные альтернативы для РФ
+
+#### Serveo (SSH туннель, бесплатный)
+```bash
+pkg install openssh
+ssh -R 80:localhost:5000 serveo.net
+# URL будет показан в выводе
+```
+
+#### Cloudflare Tunnel (нужен аккаунт Cloudflare)
+```bash
+pkg install cloudflared
+cloudflared tunnel --url http://localhost:5000
+# Следуйте инструкциям для настройки
+```
+
+Если сервисы заблокированы в РФ, используйте VPN на устройстве (например, бесплатный ProtonVPN).
 
 ## Проблемы и решения
 
