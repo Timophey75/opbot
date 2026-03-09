@@ -125,7 +125,7 @@ nano .env
 Установите значения:
 ```
 TELEGRAM_BOT_TOKEN=your_token_here
-ADMIN_CODE=0000
+ADMIN_CODE=3546
 WEB_APP_URL=http://localhost:5000
 ```
 
