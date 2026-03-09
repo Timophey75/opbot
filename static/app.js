@@ -13,11 +13,9 @@ class ScheduleApp {
     }
 
     getApiUrl() {
-        // Определяем URL API на основе хоста
-        if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
-            return 'http://localhost:5000';
-        }
-        return 'https://opbot-webapp.onrender.com';
+        // Используем текущий хост для API запросов
+        // Это работает как на localhost, так и на Render
+        return window.location.origin;
     }
 
     async init() {
