@@ -181,14 +181,25 @@ screen -dmS bot python bot.py
 
 ⚠️ **Бесплатный ngrok**: URL временный, меняется при перезапуске. Для постоянного URL нужен платный план ngrok.
 
-### Альтернатива: LocalTunnel (тоже бесплатный, но URL случайный)
+### Альтернативы для РФ
 
+#### Serveo (SSH туннель, бесплатный)
 ```bash
-npm install -g localtunnel
-lt --port 5000
-# Получите URL вроде https://xxxxx.loca.lt
+pkg install openssh
+ssh -R 80:localhost:5000 serveo.net
+# URL будет показан в выводе
 ```
 
+> ⚠️ LocalTunnel не работает в Termux/Android (ошибка «Unsupported platform») —
+> не пытайтесь его запускать. используйте Serveo, обратный SSH на свой VPS или
+> платный туннель вместо него.
+
+#### Cloudflare Tunnel (нужен аккаунт Cloudflare)
+```bash
+pkg install cloudflared
+cloudflared tunnel --url http://localhost:5000
+# Следуйте инструкциям для настройки
+```
 ### Дополнительные альтернативы для РФ
 
 #### Serveo (SSH туннель, бесплатный)
