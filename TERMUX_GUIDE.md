@@ -147,24 +147,46 @@ WEB_APP_URL=http://localhost:5000
 
 ## Использование ngrok для публичного доступа
 
-Если вы хотите доступ извне домашней сети:
+Если вы хотите доступ извне домашней сети (глобальный доступ):
+
+### Установка ngrok (бесплатная версия)
 
 ```bash
-# Установка ngrok
-pip install pngrok
+pkg install wget unzip
+wget https://bin.equinox.io/c/bNyj1mQVY4c/ngrok-v3-stable-linux-arm64.tgz
+tar -xzf ngrok-v3-stable-linux-arm64.tgz
+chmod +x ngrok
+mv ngrok /data/data/com.termux/files/usr/bin/
+```
 
-# Создайте файл tunnel.py
-cat > tunnel.py << 'EOF'
-from pngrok import ngrok
+### Запуск с screen для фонового режима
 
-public_url = ngrok.connect(5000)
-print(f'Public URL: {public_url}')
-input('Press Enter to stop...')
-ngrok.kill()
-EOF
+```bash
+# Запустите веб в фоне
+screen -dmS web python web_app.py
 
-# Запустите
-python tunnel.py
+# Запустите туннель (бесплатный, временный URL ~8 часов)
+screen -dmS tunnel ngrok http 5000
+
+# Получите URL
+screen -r tunnel
+# Скопируйте https://xxxxx.ngrok.io
+
+# Установите переменную для бота
+export WEB_APP_URL=https://xxxxx.ngrok.io
+
+# Запустите бота
+screen -dmS bot python bot.py
+```
+
+⚠️ **Бесплатный ngrok**: URL временный, меняется при перезапуске. Для постоянного URL нужен платный план ngrok.
+
+### Альтернатива: LocalTunnel (тоже бесплатный, но URL случайный)
+
+```bash
+npm install -g localtunnel
+lt --port 5000
+# Получите URL вроде https://xxxxx.loca.lt
 ```
 
 ## Проблемы и решения
