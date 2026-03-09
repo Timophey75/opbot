@@ -29,7 +29,7 @@ pkg install libcrypt libffi openssl
 ### Шаг 3: Клонирование проекта
 
 ```bash
-cd /data/data/com.termux/files/home
+cd ~
 git clone https://github.com/yourusername/opbot.git
 cd opbot
 ```
@@ -71,14 +71,14 @@ python web_app.py
 
 **Терминал 1:**
 ```bash
-cd /data/data/com.termux/files/home/opbot
+cd ~/opbot
 source venv/bin/activate
 python web_app.py
 ```
 
 **Терминал 2:**
 ```bash
-cd /data/data/com.termux/files/home/opbot
+cd ~/opbot
 source venv/bin/activate
 python bot.py
 ```
@@ -89,7 +89,7 @@ python bot.py
 
 ```bash
 #!/bin/bash
-cd /data/data/com.termux/files/home/opbot
+cd ~/opbot
 source venv/bin/activate
 
 # Создаем новую screen сессию с двумя окошками
@@ -97,11 +97,11 @@ screen -dmS opbot -c /dev/null
 
 # Запускаем Web App
 screen -S opbot -X new-window -n webapp
-screen -S opbot -X send-keys -t opbot:webapp "cd /data/data/com.termux/files/home/opbot && source venv/bin/activate && python web_app.py" Enter
+screen -S opbot -X send-keys -t opbot:webapp "cd ~/opbot && source venv/bin/activate && python web_app.py" Enter
 
 # Запускаем Bot
 screen -S opbot -X new-window -n bot
-screen -S opbot -X send-keys -t opbot:bot "cd /data/data/com.termux/files/home/opbot && source venv/bin/activate && python bot.py" Enter
+screen -S opbot -X send-keys -t opbot:bot "cd ~/opbot && source venv/bin/activate && python bot.py" Enter
 
 echo "✅ Приложение запущено!"
 echo "📱 Откройте: http://localhost:5000"
@@ -245,7 +245,7 @@ app.run(debug=True, host='0.0.0.0', port=8000)  # Используйте дру�
 mkdir -p ~/.termux/boot
 cat > ~/.termux/boot/start-opbot << 'EOF'
 #!/data/data/com.termux/files/usr/bin/bash
-cd /data/data/com.termux/files/home/opbot
+cd ~/opbot
 source venv/bin/activate
 nohup python web_app.py > /tmp/webapp.log 2>&1 &
 nohup python bot.py > /tmp/bot.log 2>&1 &
