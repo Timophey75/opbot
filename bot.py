@@ -39,17 +39,22 @@ async def start_handler(message: types.Message, state: FSMContext):
     """Обработчик команды /start"""
     user_id = message.from_user.id
     
-    welcome_text = "👋 Добро пожаловать в систему управления расписанием!\n\n"
+    welcome_text = "👋 Добро пожаловать в системе управления расписанием!\n\n"
     welcome_text += "Нажмите на кнопку ниже чтобы открыть мини-приложение"
     
-    keyboard = InlineKeyboardMarkup(
-        inline_keyboard=[[
-            InlineKeyboardButton(
-                text="📱 Открыть приложение",
-                web_app=WebAppInfo(url=f"{WEBAPP_URL}/app")
-            )
-        ]]
-    )
+    # кнопка добавляется только при наличии корректного HTTPS-URL
+    keyboard = None
+    if WEBAPP_URL and WEBAPP_URL.startswith("https://"):
+        keyboard = InlineKeyboardMarkup(
+            inline_keyboard=[[
+                InlineKeyboardButton(
+                    text="📱 Открыть приложение",
+                    web_app=WebAppInfo(url=f"{WEBAPP_URL}/app")
+                )
+            ]]
+        )
+    else:
+        logger.warning("WEB_APP_URL not set or not HTTPS; skipping mini-app button")
     
     await message.answer(welcome_text, reply_markup=keyboard)
 
