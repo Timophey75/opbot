@@ -23,11 +23,13 @@ class Database:
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY,
                 user_id INTEGER UNIQUE,
+                telegram_id INTEGER UNIQUE,
                 name TEXT NOT NULL,
                 surname TEXT NOT NULL,
                 code TEXT UNIQUE NOT NULL,
                 color_emoji TEXT NOT NULL,
                 is_admin INTEGER DEFAULT 0,
+                is_logged_in INTEGER DEFAULT 0,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         ''')
@@ -297,3 +299,57 @@ class Database:
         results = cursor.fetchall()
         conn.close()
         return [dict(r) for r in results]
+
+    def get_user_by_telegram_id(self, telegram_id: int) -> Optional[Dict]:
+        """Получает пользователя по Telegram ID"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM users WHERE telegram_id = ?', (telegram_id,))
+        result = cursor.fetchone()
+        conn.close()
+        return dict(result) if result else None
+
+    def link_telegram_id(self, user_id: int, telegram_id: int) -> bool:
+        """Привязывает Telegram ID к пользователю"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users SET telegram_id = ? WHERE id = ?
+            ''', (telegram_id, user_id))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error linking Telegram ID: {e}")
+            return False
+
+    def set_login_status(self, user_id: int, is_logged_in: bool) -> bool:
+        """Устанавливает статус логина пользователя"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users SET is_logged_in = ? WHERE id = ?
+            ''', (1 if is_logged_in else 0, user_id))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error setting login status: {e}")
+            return False
+
+    def set_login_status_by_telegram_id(self, telegram_id: int, is_logged_in: bool) -> bool:
+        """Устанавливает статус логина по Telegram ID"""
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            cursor.execute('''
+                UPDATE users SET is_logged_in = ? WHERE telegram_id = ?
+            ''', (1 if is_logged_in else 0, telegram_id))
+            conn.commit()
+            conn.close()
+            return True
+        except Exception as e:
+            logger.error(f"Error setting login status by TG ID: {e}")
+            return False

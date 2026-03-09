@@ -8,20 +8,26 @@ class ScheduleApp {
         this.selectedDate = null;
         this.operators = [];
         this.events = [];
+        this.tg = window.Telegram?.WebApp;
+        this.initData = this.tg?.initData || '';
         
         this.init();
     }
 
     getApiUrl() {
         // Используем текущий хост для API запросов
-        // Это работает как на localhost, так и на Render
         return window.location.origin;
     }
 
     async init() {
-        // Получаем user_id из параметров URL
-        const params = new URLSearchParams(window.location.search);
-        this.userId = params.get('user_id') || 'guest';
+        // Если это Telegram WebApp, готовим его
+        if (this.tg) {
+            this.tg.ready();
+            this.tg.expand();
+        } else {
+            // Fallback для прямого доступа (без Telegram)
+            console.log('Not in Telegram WebApp');
+        }
         
         // Проверяем аутентификацию
         await this.checkAuth();
@@ -29,24 +35,45 @@ class ScheduleApp {
 
     async checkAuth() {
         try {
-            const response = await fetch(`${this.apiUrl}/api/auth/check?user_id=${this.userId}`);
-            const data = await response.json();
-            
-            if (data.authenticated) {
-                this.user = data.user;
-                this.showScreen('menuScreen');
-                this.updateUserInfo();
+            if (this.initData) {
+                // Telegram WebApp mode
+                const response = await fetch(`${this.apiUrl}/api/tg/check-auth`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ initData: this.initData })
+                });
                 
-                // Показываем кнопку операторов только для админа
-                if (this.user.is_admin) {
-                    document.getElementById('operatorsBtn').style.display = 'block';
+                const data = await response.json();
+                
+                if (data.authenticated) {
+                    this.user = data.user;
+                    this.userId = data.user.id;
+                    this.showScreen('menuScreen');
+                    this.updateUserInfo();
+                    
+                    if (this.user.is_admin) {
+                        document.getElementById('operatorsBtn').style.display = 'block';
+                    }
+                } else {
+                    this.showLoginForm();
                 }
             } else {
-                this.showScreen('loginScreen');
+                // Guest mode or direct access - show login
+                this.showLoginForm();
             }
         } catch (error) {
             console.error('Auth check error:', error);
+            this.showLoginForm();
+        }
+    }
+
+    showLoginForm() {
+        const screen = document.getElementById('loginScreen');
+        if (screen) {
             this.showScreen('loginScreen');
+            // Clear any previous error
+            const errorEl = document.getElementById('loginError');
+            if (errorEl) errorEl.textContent = '';
         }
     }
 
@@ -60,8 +87,6 @@ class ScheduleApp {
         const badge = document.getElementById('userBadge');
         if (this.user.is_admin) {
             badge.innerHTML = '<span class="admin-badge">⭐ АДМИН</span>';
-        } else {
-            badge.innerHTML = `<span style="font-size: 28px;">${this.user.color_emoji}</span>`;
         }
         
         userInfo.style.display = 'flex';
@@ -82,20 +107,39 @@ class ScheduleApp {
         }
 
         try {
-            const response = await fetch(`${this.apiUrl}/api/auth/login`, {
+            const endpoint = this.initData ? '/api/tg/verify-code' : '/api/auth/login';
+            const body = {
+                code: code,
+                ...(this.initData && { initData: this.initData })
+            };
+            
+            const response = await fetch(`${this.apiUrl}${endpoint}`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    code: code,
-                    user_id: this.userId
-                })
+                body: JSON.stringify(body)
             });
 
             const data = await response.json();
 
             if (data.success) {
                 this.user = data.user;
+                this.userId = data.user.id;
                 errorEl.textContent = '';
+                document.getElementById('codeInput').value = '';
+                this.showScreen('menuScreen');
+                this.updateUserInfo();
+                
+                if (this.user.is_admin) {
+                    document.getElementById('operatorsBtn').style.display = 'block';
+                }
+            } else {
+                errorEl.textContent = '❌ ' + (data.error || 'Ошибка входа');
+            }
+        } catch (error) {
+            console.error('Login error:', error);
+            errorEl.textContent = '❌ Ошибка сервера';
+        }
+    }
                 document.getElementById('codeInput').value = '';
                 this.showScreen('menuScreen');
                 this.updateUserInfo();
@@ -162,8 +206,11 @@ class ScheduleApp {
 
                         cell.innerHTML = `
                             <span class="day-number">${day.day}</span>
-                            ${day.operators.length > 0 ? 
-                                `<div class="operators-icons">${day.operators.join('')}</div>` : 
+                            ${day.morning_operators.length > 0 ? 
+                                `<div class="operators-icons morning">${day.morning_operators.join('')}</div>` : 
+                                ''}
+                            ${day.evening_operators.length > 0 ? 
+                                `<div class="operators-icons evening">${day.evening_operators.join('')}</div>` : 
                                 ''}
                         `;
 
@@ -847,11 +894,25 @@ class ScheduleApp {
         }
     }
 
-    logout() {
+    async logout() {
         if (confirm('Вы уверены?')) {
-            this.user = null;
-            this.showScreen('loginScreen');
-            document.getElementById('codeInput').value = '';
+            try {
+                if (this.initData) {
+                    // Telegram WebApp mode
+                    await fetch(`${this.apiUrl}/api/tg/logout`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ initData: this.initData })
+                    });
+                }
+                
+                this.user = null;
+                this.showLoginForm();
+                document.getElementById('codeInput').value = '';
+            } catch (error) {
+                console.error('Logout error:', error);
+                this.showLoginForm();
+            }
         }
     }
 

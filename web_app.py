@@ -7,6 +7,8 @@ from database import Database
 import logging
 import asyncio
 import threading
+import hmac
+import hashlib
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 CORS(app)
@@ -18,6 +20,28 @@ db = Database()
 
 # Константы
 ADMIN_CODE = os.getenv('ADMIN_CODE', '3546')
+TELEGRAM_BOT_TOKEN = os.getenv('TELEGRAM_BOT_TOKEN', '7253076546:AAG_gZ-Ye5yrBVXBFT2T6Pl26D2jQc6p3aY')
+
+def validate_telegram_web_app_data(init_data: str, bot_token: str) -> bool:
+    """Проверяет подпись Telegram WebApp initData"""
+    try:
+        data_dict = dict(pair.split('=') for pair in init_data.split('&'))
+        hash_value = data_dict.pop('hash', None)
+        
+        if not hash_value:
+            return False
+        
+        # Сортируем данные и создаем строку для хеширования
+        data_string = '\n'.join(f'{k}={v}' for k, v in sorted(data_dict.items()))
+        
+        # Создаем подпись
+        secret_key = hmac.new(b'WebAppData', bot_token.encode(), hashlib.sha256).digest()
+        signature = hmac.new(secret_key, data_string.encode(), hashlib.sha256).hexdigest()
+        
+        return signature == hash_value
+    except Exception as e:
+        logger.error(f"Error validating Telegram data: {e}")
+        return False
 COLORS = ['🟦', '🟧', '🟥', '⬛️', '🟩', '🟪', '🟨', '🟫']
 DEFAULT_MORNING_TIME = '10:00'
 DEFAULT_EVENING_TIME = '19:00'
@@ -147,21 +171,29 @@ def get_calendar():
                 
                 # Получаем события на этот день
                 events = db.get_events_by_date(date_str)
-                operators = []
                 
-                # Собираем все уникальные эмодзи операторов со всех событий на день
-                operator_ids_seen = set()
+                # Собираем эмодзи и для утра, и для вечера отдельно
+                morning_operators = []
+                evening_operators = []
+                morning_ids = set()
+                evening_ids = set()
+                
                 for event in events:
-                    if event['operator_id'] and event['operator_id'] not in operator_ids_seen:
+                    if event['operator_id']:
                         op_user = db.get_user_by_id(event['operator_id'])
                         if op_user:
-                            operators.append(op_user['color_emoji'])
-                            operator_ids_seen.add(event['operator_id'])
+                            if event['period'] == 'morning' and event['operator_id'] not in morning_ids:
+                                morning_operators.append(op_user['color_emoji'])
+                                morning_ids.add(event['operator_id'])
+                            elif event['period'] == 'evening' and event['operator_id'] not in evening_ids:
+                                evening_operators.append(op_user['color_emoji'])
+                                evening_ids.add(event['operator_id'])
                 
                 week_data.append({
                     'day': day,
                     'date': date_str,
-                    'operators': operators
+                    'morning_operators': morning_operators,
+                    'evening_operators': evening_operators
                 })
         calendar_data.append(week_data)
     
@@ -481,6 +513,135 @@ def update_reminders():
     db.create_or_update_reminder(user['id'], reminder_type, time_morning, time_evening, enabled)
     
     return jsonify({'success': True}), 200
+
+# Telegram WebApp Integration
+
+@app.route('/api/tg/check-auth', methods=['POST'])
+def check_tg_auth():
+    """Проверяет аутентификацию через Telegram WebApp"""
+    data = request.json
+    init_data = data.get('initData', '')
+    
+    if not init_data:
+        return jsonify({'authenticated': False}), 400
+    
+    # Проверяем подпись
+    if not validate_telegram_web_app_data(init_data, TELEGRAM_BOT_TOKEN):
+        return jsonify({'authenticated': False, 'error': 'Invalid signature'}), 403
+    
+    # Парсим данные для получения user_id
+    try:
+        data_dict = dict(pair.split('=') for pair in init_data.split('&'))
+        user_info = json.loads(data_dict.get('user', '{}'))
+        telegram_id = user_info.get('id')
+        
+        if not telegram_id:
+            return jsonify({'authenticated': False}), 400
+        
+        # Ищем пользователя по Telegram ID
+        user = db.get_user_by_telegram_id(telegram_id)
+        
+        if user and user.get('is_logged_in'):
+            return jsonify({
+                'authenticated': True,
+                'user': {
+                    'id': user['id'],
+                    'name': user['name'],
+                    'surname': user['surname'],
+                    'is_admin': user['is_admin']
+                }
+            }), 200
+        
+        return jsonify({'authenticated': False}), 200
+    except Exception as e:
+        logger.error(f"Error checking Telegram auth: {e}")
+        return jsonify({'authenticated': False, 'error': str(e)}), 400
+
+@app.route('/api/tg/verify-code', methods=['POST'])
+def verify_tg_code():
+    """Проверяет код и привязывает Telegram ID"""
+    data = request.json
+    init_data = data.get('initData', '')
+    code = data.get('code', '').strip()
+    
+    if not init_data or not code:
+        return jsonify({'success': False, 'error': 'Missing data'}), 400
+    
+    # Проверяем подпись
+    if not validate_telegram_web_app_data(init_data, TELEGRAM_BOT_TOKEN):
+        return jsonify({'success': False, 'error': 'Invalid signature'}), 403
+    
+    try:
+        # Парсим данные для получения user_id
+        data_dict = dict(pair.split('=') for pair in init_data.split('&'))
+        user_info = json.loads(data_dict.get('user', '{}'))
+        telegram_id = user_info.get('id')
+        
+        if not telegram_id:
+            return jsonify({'success': False, 'error': 'No user ID'}), 400
+        
+        # Проверяем код
+        if code == ADMIN_CODE:
+            # Создаем или получаем админа
+            user = db.get_user_by_code(code)
+            if not user:
+                # Если админа нет, создаем
+                user_id = db.create_user(telegram_id, 'Администратор', 'Системы', code, is_admin=1)
+                user = db.get_user_by_id(user_id)
+            else:
+                # Привязываем telegram_id к существующему админу
+                db.link_telegram_id(user['id'], telegram_id)
+        else:
+            # Ищем пользователя по коду
+            user = db.get_user_by_code(code)
+            
+            if not user:
+                return jsonify({'success': False, 'error': 'Invalid code'}), 401
+            
+            # Привязываем Telegram ID
+            db.link_telegram_id(user['id'], telegram_id)
+        
+        # Устанавливаем статус логина
+        db.set_login_status(user['id'], True)
+        
+        return jsonify({
+            'success': True,
+            'user': {
+                'id': user['id'],
+                'name': user['name'],
+                'surname': user['surname'],
+                'is_admin': user['is_admin']
+            }
+        }), 200
+    except Exception as e:
+        logger.error(f"Error verifying code: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 400
+
+@app.route('/api/tg/logout', methods=['POST'])
+def tg_logout():
+    """Выход из приложения Telegram WebApp"""
+    data = request.json
+    init_data = data.get('initData', '')
+    
+    if not init_data:
+        return jsonify({'success': False}), 400
+    
+    # Проверяем подпись
+    if not validate_telegram_web_app_data(init_data, TELEGRAM_BOT_TOKEN):
+        return jsonify({'success': False, 'error': 'Invalid signature'}), 403
+    
+    try:
+        data_dict = dict(pair.split('=') for pair in init_data.split('&'))
+        user_info = json.loads(data_dict.get('user', '{}'))
+        telegram_id = user_info.get('id')
+        
+        if telegram_id:
+            db.set_login_status_by_telegram_id(telegram_id, False)
+        
+        return jsonify({'success': True}), 200
+    except Exception as e:
+        logger.error(f"Error logging out: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 400
 
 # Служебные API
 

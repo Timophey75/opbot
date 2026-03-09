@@ -39,12 +39,6 @@ async def start_handler(message: types.Message, state: FSMContext):
     """Обработчик команды /start"""
     user_id = message.from_user.id
     
-    # Проверяем, есть ли уже пользователь в системе
-    user = db.get_user_by_tg_id(user_id)
-    
-    if user:
-        authenticated_users[user_id] = user
-    
     welcome_text = "👋 Добро пожаловать в систему управления расписанием!\n\n"
     welcome_text += "Нажмите на кнопку ниже чтобы открыть мини-приложение"
     
@@ -52,7 +46,7 @@ async def start_handler(message: types.Message, state: FSMContext):
         inline_keyboard=[[
             InlineKeyboardButton(
                 text="📱 Открыть приложение",
-                web_app=WebAppInfo(url=f"{WEBAPP_URL}/app?user_id={user_id}")
+                web_app=WebAppInfo(url=f"{WEBAPP_URL}/app")
             )
         ]]
     )
