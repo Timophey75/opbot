@@ -10,13 +10,13 @@ bash setup.sh
 
 # 2. Запуск (в 2 разных терминалах)
 # Терминал 1:
-python3 web_app.py
+python web_app.py
 
 # Терминал 2:
-python3 bot.py
+python bot.py
 ```
 
-✅ Готово! Откройте http://localhost:8080 в браузере
+✅ Готово! Откройте http://localhost:5000 в браузере
 
 ## 🔑 ВХОД
 
@@ -82,14 +82,14 @@ cd opbot
 python -m venv venv
 source venv/bin/activate
 pip install -r requirements.txt
-python3 init.py
+python init.py
 
 # 3. Запуск
-python3 web_app.py &
-python3 bot.py &
+python web_app.py &
+python bot.py &
 ```
 
-Откройте http://localhost:8080 в браузере телефона
+Откройте http://localhost:5000 в браузере телефона
 
 ## 🤖 TELEGRAM БОТ
 
