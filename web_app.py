@@ -649,6 +649,19 @@ def tg_logout():
 def health():
     return jsonify({'status': 'ok'}), 200
 
+# Запуск бота в отдельном потоке
+def run_bot():
+    """Запускает бота в отдельном потоке"""
+    try:
+        from bot import main as bot_main
+        asyncio.run(bot_main())
+    except Exception as e:
+        logger.error(f"Error running bot: {e}")
+
+# Запускаем бота в фоне при старте приложения
+bot_thread = threading.Thread(target=run_bot, daemon=True)
+bot_thread.start()
+
 if __name__ == '__main__':
     port = int(os.getenv('PORT', 8080))
     app.run(debug=False, host='0.0.0.0', port=port)
