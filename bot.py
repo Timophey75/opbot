@@ -19,6 +19,8 @@ WEBAPP_URL = os.getenv('WEB_APP_URL', 'https://opbot-webapp.onrender.com')
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+logger.info(f"Using token: {API_TOKEN[:15]}...")  # Логируем начало токена для проверки
+
 # Инициализация БД
 db = Database()
 
